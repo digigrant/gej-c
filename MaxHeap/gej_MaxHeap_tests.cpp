@@ -33,6 +33,11 @@ void PrintInt(void* i) {
     std::cout << (*(int*)i) << std::endl;
 }
 
+void PrintCustom(void* i) {
+    CustomNode* cn = (CustomNode*)i;
+    std::cout << "( " << cn->key << " | " << cn->value << " )" << std::endl;
+}
+
 bool ValidateMaxHeap(MaxHeap* maxHeap, unsigned int pos) {
     if (pos >= maxHeap->numElements) { return true; }
 
@@ -123,7 +128,7 @@ TEST(MaxHeapTests, EmptyFreeAndDoubleFree) {
     ASSERT_EQ(maxHeap, nullptr);
 }
 
-TEST(MaxHeapTests, Heapify) {
+TEST(MaxHeapTests, HeapifyInt) {
     int array[5] = { 1, 2, 3, 4, 5 };
     MaxHeap* maxHeap = MaxHeapCreate(&array, sizeof(int), 5, CompareInts);
     ASSERT_NE(maxHeap, nullptr);
@@ -134,7 +139,7 @@ TEST(MaxHeapTests, Heapify) {
     ASSERT_EQ(maxHeap, nullptr);
 }
 
-TEST(MaxHeapTests, Pop) {
+TEST(MaxHeapTests, PopInt) {
     int array[5] = { 1, 2, 3, 4, 5 };
     MaxHeap* maxHeap = MaxHeapCreate(&array, sizeof(int), 5, CompareInts);
     ASSERT_NE(maxHeap, nullptr);
@@ -145,6 +150,29 @@ TEST(MaxHeapTests, Pop) {
     ASSERT_TRUE(ValidateMaxHeap(maxHeap, 0));
 
     MaxHeapPrint(maxHeap, PrintInt);
+
+    MaxHeapFree(&maxHeap);
+    ASSERT_EQ(maxHeap, nullptr);
+}
+
+TEST(MaxHeapTests, HeapifyAndPopCustom) {
+    CustomNode array[5] = {
+        { -0.5f,    11 },
+        {  0.4f,    21 },
+        { -0.3f,    41 },
+        {  0.2f,   -61 },
+        { -0.1f,   -91 }
+    };
+
+    MaxHeap* maxHeap = MaxHeapCreate(&array, sizeof(CustomNode), 5, CompareCustom);
+    ASSERT_NE(maxHeap, nullptr);
+    ASSERT_TRUE(ValidateMaxHeap(maxHeap, 0));
+    
+    CustomNode* popped = (CustomNode*)MaxHeapPop(maxHeap);
+    ASSERT_FLOAT_EQ(popped->key, 0.4);
+    ASSERT_EQ(popped->value, 21);
+    ASSERT_EQ(maxHeap->numElements, 4);
+    ASSERT_TRUE(ValidateMaxHeap(maxHeap, 0));
 
     MaxHeapFree(&maxHeap);
     ASSERT_EQ(maxHeap, nullptr);
