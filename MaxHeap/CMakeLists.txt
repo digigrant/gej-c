@@ -12,7 +12,11 @@ set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_library(gej_MaxHeap STATIC gej_MaxHeap.c)
+add_library(gej_MaxHeap STATIC src/gej_MaxHeap.c)
+target_include_directories(gej_MaxHeap
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
 
 option(BUILD_TESTS "Build tests for MaxHeap lib" OFF)
 if(BUILD_TESTS)
@@ -35,6 +39,7 @@ if(BUILD_TESTS)
         GTest::gtest
         GTest::gtest_main
     )
+    target_include_directories(gej_MaxHeap_tests PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
     include(GoogleTest)
     gtest_discover_tests(gej_MaxHeap_tests)
