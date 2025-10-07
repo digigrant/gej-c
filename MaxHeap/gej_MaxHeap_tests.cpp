@@ -10,12 +10,12 @@ struct CustomNode {
     int value = 0;
 };
 
-int CompareInts(void* a, void* b) {
+int CompareInts(void const * a, void const * b) {
     return (*(int*)a) - (*(int*)b);
 }
 
 const float EPSILON = 0.0001f;
-int CompareFloats(void* a, void* b) {
+int CompareFloats(void const * a, void const * b) {
     float diff = (*(float*)a) - (*(float*)b);
 
     if (abs(diff) < EPSILON) { return 0; }
@@ -23,40 +23,44 @@ int CompareFloats(void* a, void* b) {
     return -1;
 }
 
-int CompareCustom(void* a, void* b) {
+int CompareCustom(void const * a, void const * b) {
     CustomNode cn_a = (*(CustomNode*)a);
     CustomNode cn_b = (*(CustomNode*)b);
     return CompareFloats(&(cn_a.key), &(cn_b.key));
 }
 
-void PrintInt(void* i) {
+void PrintInt(void const * i) {
     std::cout << (*(int*)i) << std::endl;
 }
 
-void PrintCustom(void* i) {
+void PrintCustom(void const * i) {
     CustomNode* cn = (CustomNode*)i;
     std::cout << "( " << cn->key << " | " << cn->value << " )" << std::endl;
 }
 
-bool ValidateMaxHeap(MaxHeap* maxHeap, unsigned int pos) {
-    if (pos >= maxHeap->numElements) { return true; }
+bool ValidateMaxHeap(void* array, size_t elementSize, unsigned int numElements, int (*fpCompare)(void const * a, void const * b), unsigned int pos) {
+    if (pos >= numElements) { return true; }
 
     unsigned int leftChild = GetLeftChildIndex(pos);
     unsigned int rightChild = leftChild+1;
 
     // validate current element against children
-    if (leftChild < maxHeap->numElements &&
-        maxHeap->fpCompare(GetPointerToElement(maxHeap, pos), GetPointerToElement(maxHeap, leftChild)) < 0) {
+    if (leftChild < numElements &&
+        fpCompare(
+            GetPointerToElement(array, elementSize, numElements, pos),
+            GetPointerToElement(array, elementSize, numElements, leftChild)) < 0) {
         return false;
     }
-    if (rightChild < maxHeap->numElements &&
-        maxHeap->fpCompare(GetPointerToElement(maxHeap, pos), GetPointerToElement(maxHeap, rightChild)) < 0) {
+    if (rightChild < numElements &&
+        fpCompare(
+            GetPointerToElement(array, elementSize, numElements, pos),
+            GetPointerToElement(array, elementSize, numElements, rightChild)) < 0) {
         return false;
     }
 
     // validate child heaps
-    if (!ValidateMaxHeap(maxHeap, leftChild)) { return false; }
-    if (!ValidateMaxHeap(maxHeap, rightChild)) { return false; }
+    if (!ValidateMaxHeap(array, elementSize, numElements, fpCompare, leftChild)) { return false; }
+    if (!ValidateMaxHeap(array, elementSize, numElements, fpCompare, rightChild)) { return false; }
 
     return true;
 }
@@ -86,73 +90,36 @@ TEST(UtilityTests, CompareCustom) {
     ASSERT_EQ(CompareCustom(&(array[0]), &(array[0])), 0);
 }
 
-TEST(UtilityTests, ValidateMaxHeap) {
-    MaxHeap* maxHeap = (MaxHeap*)malloc(sizeof(MaxHeap));
-    ASSERT_NE(maxHeap, nullptr);
+TEST(UtilityTests, ValidateHeap) {
 
     int array1[10] = { 10, 9, 8, 7, 6, 5, 4, 3, 2, 1 };
-    maxHeap->head = &array1;
-    maxHeap->elementSize = sizeof(int);
-    maxHeap->numElements = 10;
-    maxHeap->fpCompare = CompareInts;
-    ASSERT_TRUE(ValidateMaxHeap(maxHeap, 0));
+    unsigned int numElements = 10;
+    ASSERT_TRUE(ValidateMaxHeap(array1, sizeof(int), numElements, CompareInts, 0));
 
     int array2[10] = { 10, 9, 8, 7, 6, 5, 4, 3, 2, 10 };
-    maxHeap->head = &array2;
-    ASSERT_FALSE(ValidateMaxHeap(maxHeap, 0));
-}
-
-TEST(MaxHeapTests, CreateAndFree) {
-    int array[5] = { 1, 2, 3, 4, 5 };
-    MaxHeap* maxHeap = MaxHeapCreate(&array, sizeof(int), 5, CompareInts);
-    ASSERT_NE(maxHeap, nullptr);
-
-    MaxHeapFree(&maxHeap);
-    ASSERT_EQ(maxHeap, nullptr);
-}
-
-TEST(MaxHeapTests, EmptyFreeAndDoubleFree) {
-    int array[5] = { 1, 2, 3, 4, 5 };
-    MaxHeap* maxHeap = nullptr;
-
-    // Empty free
-    MaxHeapFree(&maxHeap);
-    ASSERT_EQ(maxHeap, nullptr);
-    
-    // Double free
-    maxHeap = MaxHeapCreate(&array, sizeof(int), 5, CompareInts);
-    ASSERT_NE(maxHeap, nullptr);
-    MaxHeapFree(&maxHeap);
-    ASSERT_EQ(maxHeap, nullptr);
-    MaxHeapFree(&maxHeap);
-    ASSERT_EQ(maxHeap, nullptr);
+    numElements = 10;
+    ASSERT_FALSE(ValidateMaxHeap(array2, sizeof(int), numElements, CompareInts, 0));
 }
 
 TEST(MaxHeapTests, HeapifyInt) {
     int array[5] = { 1, 2, 3, 4, 5 };
-    MaxHeap* maxHeap = MaxHeapCreate(&array, sizeof(int), 5, CompareInts);
-    ASSERT_NE(maxHeap, nullptr);
-
-    ASSERT_TRUE(ValidateMaxHeap(maxHeap, 0));
-
-    MaxHeapFree(&maxHeap);
-    ASSERT_EQ(maxHeap, nullptr);
+    unsigned int numElements = 5;
+    Heapify(array, sizeof(int), numElements, CompareInts);
+    ASSERT_TRUE(ValidateMaxHeap(array, sizeof(int), numElements, CompareInts, 0));
 }
 
 TEST(MaxHeapTests, PopInt) {
     int array[5] = { 1, 2, 3, 4, 5 };
-    MaxHeap* maxHeap = MaxHeapCreate(&array, sizeof(int), 5, CompareInts);
-    ASSERT_NE(maxHeap, nullptr);
+    unsigned int numElements = 5;
+    Heapify(array, sizeof(int), numElements, CompareInts);
+    ASSERT_TRUE(ValidateMaxHeap(array, sizeof(int), numElements, CompareInts, 0));
     
-    int* popped = (int*)MaxHeapPop(maxHeap);
+    int* popped = (int*)HeapPop(array, sizeof(int), &numElements, CompareInts);
     ASSERT_EQ(*popped, 5);
-    ASSERT_EQ(maxHeap->numElements, 4);
-    ASSERT_TRUE(ValidateMaxHeap(maxHeap, 0));
+    ASSERT_EQ(numElements, 4);
+    ASSERT_TRUE(ValidateMaxHeap(array, sizeof(int), numElements, CompareInts, 0));
 
-    MaxHeapPrint(maxHeap, PrintInt);
-
-    MaxHeapFree(&maxHeap);
-    ASSERT_EQ(maxHeap, nullptr);
+    HeapPrint(array, sizeof(int), numElements, PrintInt);
 }
 
 TEST(MaxHeapTests, HeapifyAndPopCustom) {
@@ -163,17 +130,14 @@ TEST(MaxHeapTests, HeapifyAndPopCustom) {
         {  0.2f,   -61 },
         { -0.1f,   -91 }
     };
+    unsigned int numElements = 5;
 
-    MaxHeap* maxHeap = MaxHeapCreate(&array, sizeof(CustomNode), 5, CompareCustom);
-    ASSERT_NE(maxHeap, nullptr);
-    ASSERT_TRUE(ValidateMaxHeap(maxHeap, 0));
+    Heapify(array, sizeof(CustomNode), numElements, CompareCustom);
+    ASSERT_TRUE(ValidateMaxHeap(array, sizeof(CustomNode), numElements, CompareCustom, 0));
     
-    CustomNode* popped = (CustomNode*)MaxHeapPop(maxHeap);
+    CustomNode* popped = (CustomNode*)HeapPop(array, sizeof(CustomNode), &numElements, CompareCustom);
     ASSERT_FLOAT_EQ(popped->key, 0.4);
     ASSERT_EQ(popped->value, 21);
-    ASSERT_EQ(maxHeap->numElements, 4);
-    ASSERT_TRUE(ValidateMaxHeap(maxHeap, 0));
-
-    MaxHeapFree(&maxHeap);
-    ASSERT_EQ(maxHeap, nullptr);
+    ASSERT_EQ(numElements, 4);
+    ASSERT_TRUE(ValidateMaxHeap(array, sizeof(CustomNode), numElements, CompareCustom, 0));
 }

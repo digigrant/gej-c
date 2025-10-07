@@ -5,101 +5,75 @@
 #include "gej_MaxHeap_internal.h"
 
 /* PUBLIC FUNCTION IMPLEMENTATIONS */
-MaxHeap* MaxHeapCreate(void* head, size_t elementSize, unsigned int numElements, int (*fpCompare)(void* a, void* b)) {
-	MaxHeap* maxHeap = (MaxHeap*)malloc(sizeof(MaxHeap));
-	if (!maxHeap) { return NULL; }
 
-	maxHeap->head = head;
-	maxHeap->elementSize = elementSize;
-	maxHeap->numElements = numElements;
-	maxHeap->fpCompare = fpCompare;
-
-	// heapify
-	unsigned int posLastParent = GetParentIndex((maxHeap->numElements)-1);
+void Heapify(void* array, size_t elementSize, unsigned int numElements, int (*fpCompare)(void const * a, void const * b)) {
+	// get last parent node
+	unsigned int posLastParent = GetParentIndex((numElements)-1);
+	// bubble all parents down in reverse order
 	for (int i = posLastParent; i > -1; --i) {
-		BubbleDown(maxHeap, i);
+		BubbleDown(array, elementSize, numElements, fpCompare, i);
 	}
-
-	return maxHeap;
 }
 
-void MaxHeapFree(MaxHeap** maxHeap) {
-	if (!maxHeap || !(*maxHeap)) { return; }
-	free(*maxHeap);
-	(*maxHeap) = NULL;
-}
-
-/*
-void MaxHeapInsert(MaxHeap* maxHeap, Node* newNode) {
-	++(maxHeap->n);
-	memcpy(&(maxHeap->head[maxHeap->n]), newNode, sizeof(Node)); 
-	//h->head[h->n] = x;
-	MaxHeapBubbleUp(maxHeap, maxHeap->n);
-	// MaxHeapPrint(h);
-}
-*/
-
-void* MaxHeapPop(MaxHeap* maxHeap) {
-	if (maxHeap->numElements < 1) {
+// NOTE: Automatically decrements numElements after popping
+void* HeapPop(void* array, size_t elementSize, unsigned int* numElements, int (*fpCompare)(void const * a, void const * b)) {
+	if ((*numElements) < 1) {
 		printf("Tried to pop from empty queue. Returning NULL.\n");
 		return NULL;
 	}
 
-	SwapElements(maxHeap, 0, (maxHeap->numElements)-1);	// swap 0 and last element
-	--(maxHeap->numElements);
-	BubbleDown(maxHeap, 0);
+	SwapElements(array, elementSize, (*numElements), 0, (*numElements)-1);	// swap 0 and last element
+	--(*numElements);
+	BubbleDown(array, elementSize, (*numElements), fpCompare, 0);
 
 	// this is a pointer to data that is not in the "active" maxHeap anymore
 	// (it is still inside the array but outside of head[numElements])
 	// it may be invalidated if it is not used right away
-	return GetPointerToElement(maxHeap, maxHeap->numElements);
+	return GetPointerToElement(array, elementSize, (*numElements)+1, (*numElements));
 }
 
-void MaxHeapPrint(MaxHeap* maxHeap, void (*fpPrintElement)(void* element)) {
+void HeapPrint(void* array, size_t elementSize, unsigned int numElements, void (*fpPrintElement)(void const * element)) {
 	printf("Printing heap\n");
-	PrintElement(maxHeap, fpPrintElement, 0);
+	PrintHeapElement(array, elementSize, numElements, fpPrintElement, 0);
 }
 
 /* PRIVATE FUNCTION IMPLEMENTATIONS */
+// (pos-1)/2
 unsigned int GetParentIndex(unsigned int pos) {
 	return (pos-1) / 2;
 }
 
+// (pos*2)+1
 unsigned int GetLeftChildIndex(unsigned int pos) {
 	return (pos*2) + 1;
 }
 
-void* GetPointerToElement(MaxHeap* maxHeap, unsigned int pos) {
-	return maxHeap->head + (pos * maxHeap->elementSize);
-}
-
-/*
-void MaxHeapBubbleUp(MaxHeap* maxHeap, unsigned int i) {
-	if (MaxHeapGetParentIndex(i) < 1) { return; }
-
-	int compareResult = maxHeap->fpCompare(&(maxHeap->head[i]), &(maxHeap->head[MaxHeapGetParentIndex(i)]));
-	if (compareResult > 0) {	// a > b
-		MaxHeapSwap(maxHeap, i, MaxHeapGetParentIndex(i));
-		MaxHeapBubbleUp(maxHeap, MaxHeapGetParentIndex(i));
+void* GetPointerToElement(void* array, size_t elementSize, unsigned int numElements, unsigned int pos) {
+	if (pos >= numElements) {	// this seems like a good idea
+		printf("Tried to get the pointer to an element outside of the max heap: index %d (numElements = %d)\n", pos, numElements);
+		return NULL;
 	}
-}
-*/
-
-void SwapElements(MaxHeap* maxHeap, unsigned int pos1, unsigned int pos2) {
-	char buffer[maxHeap->elementSize];
-	memcpy(&buffer, GetPointerToElement(maxHeap, pos1), maxHeap->elementSize);								// buffer	<- pos1
-	memcpy(GetPointerToElement(maxHeap, pos1), GetPointerToElement(maxHeap, pos2), maxHeap->elementSize);	// pos1		<- pos2
-	memcpy(GetPointerToElement(maxHeap, pos2), &buffer, maxHeap->elementSize);								// pos2		<- buffer
+	return array + (pos * elementSize);
 }
 
-void BubbleDown(MaxHeap* maxHeap, unsigned int pos) {
+void SwapElements(void* array, size_t elementSize, unsigned int numElements, unsigned int pos1, unsigned int pos2) {
+	char buffer[elementSize];
+	// 1. buffer	<- pos1
+	// 2. pos1		<- pos2
+	// 3. pos2		<- buffer
+	memcpy(&buffer, GetPointerToElement(array, elementSize, numElements, pos1), elementSize);
+	memcpy(GetPointerToElement(array, elementSize, numElements, pos1), GetPointerToElement(array, elementSize, numElements, pos2), elementSize);
+	memcpy(GetPointerToElement(array, elementSize, numElements, pos2), &buffer, elementSize);
+}
+
+void BubbleDown(void* array, size_t elementSize, unsigned int numElements, int (*fpCompare)(void const * a, void const * b), unsigned int pos) {
 	unsigned int leftChild = GetLeftChildIndex(pos);
 	unsigned int maxIndex = pos;
 
 	// get max value out of pos, left child, right child
 	for (int i = 0; i <= 1; ++i) {
-		if (leftChild+i < maxHeap->numElements) {
-			if (maxHeap->fpCompare(GetPointerToElement(maxHeap, leftChild+i), GetPointerToElement(maxHeap, maxIndex)) > 0) {
+		if (leftChild+i < numElements) {
+			if (fpCompare(GetPointerToElement(array, elementSize, numElements, leftChild+i), GetPointerToElement(array, elementSize, numElements, maxIndex)) > 0) {
 				maxIndex = leftChild+i;
 			}
 		}
@@ -108,18 +82,18 @@ void BubbleDown(MaxHeap* maxHeap, unsigned int pos) {
 	// if pos is not the max value, swap pos and max
 	// continue bubbling pos down
 	if (maxIndex != pos) {
-		SwapElements(maxHeap, pos, maxIndex);
-		BubbleDown(maxHeap, maxIndex);
+		SwapElements(array, elementSize, numElements, pos, maxIndex);
+		BubbleDown(array, elementSize, numElements, fpCompare, maxIndex);
 	}
 }
 
-void PrintElement(MaxHeap* maxHeap, void (*fpPrintElement)(void* element), unsigned int pos) {
-	if (pos >= maxHeap->numElements) { return; }
+void PrintHeapElement(void * array, size_t elementSize, unsigned int numElements, void (*fpPrintElement)(void const* element), unsigned int pos) {
+	if (pos >= numElements) { return; }
 
 	unsigned int depth = log2(pos+1);
 	for (int i = 0; i < depth; ++i) { printf("\t"); }
-	fpPrintElement(GetPointerToElement(maxHeap, pos));
+	fpPrintElement(GetPointerToElement(array, elementSize, numElements, pos));
 
-	PrintElement(maxHeap, fpPrintElement, GetLeftChildIndex(pos));
-	PrintElement(maxHeap, fpPrintElement, GetLeftChildIndex(pos)+1);
+	PrintHeapElement(array, elementSize, numElements, fpPrintElement, GetLeftChildIndex(pos));
+	PrintHeapElement(array, elementSize, numElements, fpPrintElement, GetLeftChildIndex(pos)+1);
 }
